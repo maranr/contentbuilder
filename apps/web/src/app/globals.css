@@ -1,0 +1,41 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html, body {
+  height: 100%;
+}
+
+/* Minimal prose styles so headings/blocks render WYSIWYG without extra plugins */
+.prose { color: #111827; max-width: none; }
+.prose h1 { font-size: 2.25rem; line-height: 2.5rem; font-weight: 700; margin: 1rem 0; }
+.prose h2 { font-size: 1.875rem; line-height: 2.25rem; font-weight: 600; margin: 0.75rem 0; }
+.prose h3 { font-size: 1.5rem; line-height: 2rem; font-weight: 600; margin: 0.5rem 0; }
+.prose p { margin: 0.75rem 0; }
+.prose ul { list-style: disc; padding-left: 1.5rem; margin: 0.75rem 0; }
+.prose ol { list-style: decimal; padding-left: 1.5rem; margin: 0.75rem 0; }
+.prose blockquote { border-left: 4px solid #e5e7eb; padding-left: 1rem; color: #6b7280; margin: 0.75rem 0; }
+.prose hr { border: 0; border-top: 1px solid #e5e7eb; margin: 1rem 0; }
+
+
+
+/* Drag handle positioning: ensure each top-level block is a positioning context */
+.ProseMirror > * { position: relative; }
+.ProseMirror ul, .ProseMirror ol { position: relative; }
+.tiptap-drag-handle { z-index: 20; }
+.tiptap-drag-handle { -webkit-user-drag: element; user-select: none; }
+
+/* Show kebab only on hover of the block */
+.ProseMirror > *:hover .tiptap-kebab { opacity: 1 !important; }
+
+/* Hide bubble menu while dragging to avoid accidental clicks */
+.ProseMirror[data-dragging="true"] ~ .tippy-box,
+.ProseMirror[data-dragging="true"] .tippy-box,
+.ProseMirror[data-handle-press="true"] ~ .tippy-box,
+.ProseMirror[data-handle-press="true"] .tippy-box { display: none !important; }
+
+/* Provide extra drop space at the bottom of the editor */
+.ProseMirror { position: relative; padding-bottom: 96px; }
+
+/* BlockAttributes writes inline styles directly; no attr() needed here */
+

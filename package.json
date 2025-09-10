@@ -1,0 +1,27 @@
+{
+  "name": "contentbuider",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Monorepo for course content builder",
+  "main": "index.js",
+  "type": "commonjs",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "lint": "turbo run lint",
+    "clean": "turbo run clean",
+    "start:windows": "powershell -NoProfile -ExecutionPolicy Bypass -File ./start.ps1",
+    "stop:windows": "powershell -NoProfile -ExecutionPolicy Bypass -File ./stop.ps1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "turbo": "^2.5.5"
+  },
+  "packageManager": "npm@10.8.2"
+}
