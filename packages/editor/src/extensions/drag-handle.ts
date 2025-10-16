@@ -7,16 +7,60 @@ const DragHandlePluginKey = new PluginKey('drag-handle');
 function findTopLevelPosFromCoords(view: EditorView, _clientX: number, clientY: number): { start: number; end: number } | null {
   const root = view.dom as HTMLElement;
   const rect = root.getBoundingClientRect();
-  // Sample X at the center of the editor so dropping works across the entire width
-  const sampleX = rect.left + rect.width / 2;
-  // Clamp Y inside the editor bounds to always get a position
-  const clampedY = Math.max(rect.top + 1, Math.min(clientY, rect.bottom - 1));
-  const pos = view.posAtCoords({ left: sampleX, top: clampedY });
-  if (!pos) return null;
-  const $pos = view.state.doc.resolve(pos.pos);
+  
+  // NEW APPROACH: Find which top-level block we're over by checking DOM elements directly
+  // This fixes the "gap" problem where hovering between blocks gave inconsistent results
+  
+  // Get all top-level DOM elements (direct children of .ProseMirror)
+  const topLevelElements = Array.from(root.children) as HTMLElement[];
+  
+  // Find which block the mouse Y is closest to
+  let closestBlock: { element: HTMLElement; distance: number; isAbove: boolean } | null = null;
+  
+  for (const el of topLevelElements) {
+    // Skip if not a block element (e.g., skip widgets)
+    if (!el.matches('p, h1, h2, h3, h4, h5, h6, ul, ol, blockquote, pre, hr, div.hr-block')) continue;
+    
+    const elRect = el.getBoundingClientRect();
+    
+    // Check if mouse is within this element's vertical bounds
+    if (clientY >= elRect.top && clientY <= elRect.bottom) {
+      // Mouse is directly over this element
+      closestBlock = { element: el, distance: 0, isAbove: false };
+      break;
+    }
+    
+    // Check if mouse is above this element
+    if (clientY < elRect.top) {
+      const distance = elRect.top - clientY;
+      if (!closestBlock || distance < closestBlock.distance) {
+        closestBlock = { element: el, distance, isAbove: true };
+      }
+    }
+    
+    // Check if mouse is below this element  
+    if (clientY > elRect.bottom) {
+      const distance = clientY - elRect.bottom;
+      if (!closestBlock || distance < closestBlock.distance) {
+        closestBlock = { element: el, distance, isAbove: false };
+      }
+    }
+  }
+  
+  if (!closestBlock) return null;
+  
+  // Find the ProseMirror position for this DOM element
+  const domPos = view.posAtDOM(closestBlock.element, 0);
+  if (domPos == null) return null;
+  
+  const $pos = view.state.doc.resolve(domPos);
   if ($pos.depth < 1) return null;
+  
+  // Get the top-level block bounds
   const start = $pos.before(1);
-  const end = start + $pos.node(1).nodeSize;
+  const node = $pos.node(1);
+  const end = start + node.nodeSize;
+  
   return { start, end };
 }
 
@@ -113,7 +157,6 @@ export const DragHandle = Extension.create({
               event.preventDefault();
               if (event.dataTransfer) event.dataTransfer.dropEffect = 'move';
               // Show indicator at computed insertion line
-              // compute bounds and y
               const dragEvent = event as DragEvent;
               const bounds = findTopLevelPosFromCoords(view, dragEvent.clientX, dragEvent.clientY);
               const rootRect = (view.dom as HTMLElement).getBoundingClientRect();
@@ -122,7 +165,17 @@ export const DragHandle = Extension.create({
                 const endCoords = view.coordsAtPos(view.state.doc.content.size);
                 y = endCoords.bottom - rootRect.top;
               } else {
-                const nodeEl = (view.nodeDOM(bounds.start) as HTMLElement) || null;
+                // CRITICAL: Get the top-level DOM element directly
+                // nodeDOM might return nested elements, so we traverse up to find the direct child of .ProseMirror
+                let nodeEl = view.nodeDOM(bounds.start) as HTMLElement | null;
+                if (nodeEl) {
+                  // Traverse up to find the direct child of .ProseMirror
+                  const prosemirror = view.dom as HTMLElement;
+                  while (nodeEl && nodeEl.parentElement !== prosemirror) {
+                    nodeEl = nodeEl.parentElement;
+                  }
+                }
+                
                 let rectTop: number;
                 let rectBottom: number;
                 if (nodeEl) {
@@ -130,16 +183,24 @@ export const DragHandle = Extension.create({
                   rectTop = r.top;
                   rectBottom = r.bottom;
                 } else {
+                  // Fallback to coordinate calculation
                   const sc = view.coordsAtPos(bounds.start);
                   const ec = view.coordsAtPos(bounds.end);
                   rectTop = sc.top; rectBottom = ec.bottom;
                 }
                 const rectHeight = Math.max(1, rectBottom - rectTop);
-                const edgeSnapPx = 12;
+                // Adaptive edge snap: use 1/4 of block height, min 6px, max 16px
+                // This prevents overlap on small blocks while keeping good UX on large blocks
+                const edgeSnapPx = Math.min(16, Math.max(6, rectHeight * 0.25));
                 let dropBefore: boolean;
-                if (dragEvent.clientY <= rectTop + edgeSnapPx) dropBefore = true;
-                else if (dragEvent.clientY >= rectBottom - edgeSnapPx) dropBefore = false;
-                else dropBefore = dragEvent.clientY < rectTop + rectHeight * 0.5;
+                if (dragEvent.clientY <= rectTop + edgeSnapPx) {
+                  dropBefore = true;
+                } else if (dragEvent.clientY >= rectBottom - edgeSnapPx) {
+                  dropBefore = false;
+                } else {
+                  // In the middle zone, use 50% threshold
+                  dropBefore = dragEvent.clientY < rectTop + rectHeight * 0.5;
+                }
                 y = (dropBefore ? rectTop : rectBottom) - rootRect.top;
               }
               const host = view.dom as HTMLElement;
@@ -150,15 +211,18 @@ export const DragHandle = Extension.create({
                 bar.style.position = 'absolute';
                 bar.style.left = '0';
                 bar.style.right = '0';
-                bar.style.height = '2px';
+                bar.style.height = '3px';
                 bar.style.background = '#3b82f6';
-                bar.style.boxShadow = '0 0 0 1px rgba(59,130,246,0.15)';
+                bar.style.boxShadow = '0 1px 3px rgba(59,130,246,0.4)';
+                bar.style.borderRadius = '2px';
                 bar.style.pointerEvents = 'none';
                 bar.style.display = 'none';
+                bar.style.zIndex = '100';
                 host.appendChild(bar);
               }
               if (y !== null && bar) {
-                bar.style.top = `${y}px`;
+                // Offset indicator by -1px so it's visually centered on the drop line
+                bar.style.top = `${y - 1}px`;
                 bar.style.display = 'block';
               }
               return true;
@@ -192,8 +256,17 @@ export const DragHandle = Extension.create({
                 // Could not determine a valid target (e.g., pointer outside editor). Cancel move.
                 return true;
               } else {
-                // Prefer the DOM node's actual element if available (improves HR accuracy)
-                const nodeEl = view.nodeDOM(bounds.start) as HTMLElement | null;
+                // CRITICAL: Get the top-level DOM element directly (same as dragover)
+                // nodeDOM might return nested elements, so we traverse up to find the direct child of .ProseMirror
+                let nodeEl = view.nodeDOM(bounds.start) as HTMLElement | null;
+                if (nodeEl) {
+                  // Traverse up to find the direct child of .ProseMirror
+                  const prosemirror = view.dom as HTMLElement;
+                  while (nodeEl && nodeEl.parentElement !== prosemirror) {
+                    nodeEl = nodeEl.parentElement;
+                  }
+                }
+                
                 let rectTop: number;
                 let rectBottom: number;
                 if (nodeEl) {
@@ -201,34 +274,48 @@ export const DragHandle = Extension.create({
                   rectTop = rect.top;
                   rectBottom = rect.bottom;
                 } else {
+                  // Fallback to coordinate calculation
                   const startCoords = view.coordsAtPos(bounds.start);
                   const endCoords = view.coordsAtPos(bounds.end);
                   rectTop = startCoords.top;
                   rectBottom = endCoords.bottom;
                 }
                 const rectHeight = Math.max(1, rectBottom - rectTop);
-                // Edge snapping makes dropping above/below more reliable
-                const edgeSnapPx = 12; // snap if pointer is within 12px of top/bottom edge
+                // Use same adaptive edge snap as dragover for consistency
+                const edgeSnapPx = Math.min(16, Math.max(6, rectHeight * 0.25));
                 let dropBefore: boolean;
                 if (dragEvent.clientY <= rectTop + edgeSnapPx) {
                   dropBefore = true;
                 } else if (dragEvent.clientY >= rectBottom - edgeSnapPx) {
                   dropBefore = false;
                 } else {
-                  // Balanced threshold in the middle when not near edges
-                  const threshold = rectTop + rectHeight * 0.5;
-                  dropBefore = dragEvent.clientY < threshold;
+                  // In the middle zone, use 50% threshold
+                  dropBefore = dragEvent.clientY < rectTop + rectHeight * 0.5;
                 }
                 insertPos = dropBefore ? bounds.start : bounds.end;
               }
 
               // Build transaction to move dragged block by range
+              // Check for no-op (trying to drop in the same position)
+              if (insertPos >= from && insertPos <= to) {
+                // Dropping within the same block - no operation needed
+                return true;
+              }
+              
               const slice = view.state.doc.slice(from, to);
               let tr = view.state.tr.delete(from, to);
+              
               // Adjust insert position if it was after the deleted content
-              if (insertPos > from) insertPos -= (to - from);
-              if (insertPos === from) insertPos = to; // no-op guard
-              tr = tr.insert(insertPos, slice.content);
+              let adjustedInsertPos = insertPos;
+              if (adjustedInsertPos > to) {
+                // insertPos is after the deleted block, subtract the deleted size
+                adjustedInsertPos -= (to - from);
+              } else if (adjustedInsertPos > from) {
+                // insertPos is between from and to (shouldn't happen due to no-op check above)
+                adjustedInsertPos = from;
+              }
+              
+              tr = tr.insert(adjustedInsertPos, slice.content);
               view.dispatch(tr.scrollIntoView());
               currentDragRange = null;
               return true;

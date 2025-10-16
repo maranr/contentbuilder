@@ -64,6 +64,32 @@ export function RichEditor({
 function EditorWithSidebar({ editor, onBackgroundMouseDown }: { editor: any; onBackgroundMouseDown: (e: React.MouseEvent<HTMLDivElement>) => void }) {
   const [openPos, setOpenPos] = React.useState<number | null>(null);
   const [sidebarTop, setSidebarTop] = React.useState<number>(8);
+  const [blockType, setBlockType] = React.useState<string>('');
+
+  // Get block type name for display
+  const getBlockTypeName = React.useCallback((pos: number | null): string => {
+    if (!editor || pos == null) return '';
+    const node = editor.state.doc.nodeAt(pos);
+    if (!node) return '';
+    const type = node.type.name;
+    // Format for display
+    const nameMap: Record<string, string> = {
+      paragraph: 'Paragraph',
+      heading: `Heading ${node.attrs.level || ''}`,
+      blockquote: 'Blockquote',
+      codeBlock: 'Code Block',
+      bulletList: 'Bullet List',
+      orderedList: 'Numbered List',
+      listItem: 'List Item',
+      horizontalRule: 'Divider',
+    };
+    return nameMap[type] || type;
+  }, [editor]);
+
+  // Update block type when openPos changes
+  React.useEffect(() => {
+    setBlockType(getBlockTypeName(openPos));
+  }, [openPos, getBlockTypeName]);
 
   // Open/close via kebab and outside clicks; ignore clicks inside sidebar
   React.useEffect(() => {
@@ -129,7 +155,9 @@ function EditorWithSidebar({ editor, onBackgroundMouseDown }: { editor: any; onB
       {openPos != null && (
         <aside className="tiptap-props-sidebar absolute left-0 w-[280px] border-r bg-white z-40 p-2 overflow-auto max-h-[calc(100vh-16px)]" style={{ top: sidebarTop }}>
           <div className="flex items-center justify-between px-1 py-1">
-            <div className="text-xs font-medium text-gray-600">Block properties</div>
+            <div className="text-xs font-medium text-gray-600">
+              Block properties{blockType && ` - ${blockType}`}
+            </div>
             <button type="button" className="text-gray-500" onClick={() => setOpenPos(null)}>×</button>
           </div>
           <BlockPropsPopover editor={editor} targetPos={openPos} onRequestClose={() => setOpenPos(null)} />

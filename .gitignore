@@ -6,6 +6,9 @@ node_modules/
 apps/web/.next/
 apps/web/out/
 
+# turborepo cache
+.turbo/
+
 # logs
 *.log
 npm-debug.log*

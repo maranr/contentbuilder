@@ -99,13 +99,53 @@ npm run stop:windows
 - Minimal prose styles live in `apps/web/src/app/globals.css` under the `.prose` rules to render H1/H2, lists, quotes, and dividers at sensible sizes without extra plugins.
 - The app page (`apps/web/src/app/page.tsx`) renders only the editor; the raw HTML preview was removed.
 
+### Slash Menu (Notion-like UI)
+The slash menu now features:
+- **Modern icons** from Lucide React for all block types
+- **Organized categories**: Basic (text & headings), Lists, Advanced (quotes, code, dividers)
+- **Live preview panel**: Right-side panel renders actual preview of each block with proper styling
+  - Headings show in their actual sizes (H1 large, H2 medium, H3 small)
+  - Lists, quotes, code blocks, and dividers preview their appearance
+- **Enhanced styling**: Smooth hover states, blue highlight for selected items, keyboard navigation
+- **Keyboard shortcuts**: Arrow keys to navigate, Enter to select, Escape to close
+- **Smart search**: Type after "/" to filter commands by name
+
 ### Customization
 - Add or reorder slash items in `packages/editor/src/extensions/slash-command.tsx` (`defaultCommands`).
+  - Each item requires: title, description, section, icon (Lucide component), preview text, command function
 - Tweak rendering sizes in `apps/web/src/app/globals.css` under the `.prose` selectors.
+  - All blocks default to 10px top and bottom margins for consistent spacing
 - Re‑enable block drag/reorder by restoring the `DragHandle` extension import in `rich-editor.tsx` (left out by design for now).
 
+### Drag and Drop
+Block reordering via drag and drop has been significantly improved with the following fixes:
+- **Fixed handle visibility**: Only one drag handle shows at a time (previously multiple could be visible)
+- **Standardized HR handle**: Horizontal rule now uses consistent positioning (-32px left) and styling (18px × 24px)
+- **Improved HR targeting**: HR block height increased from 20px to 40px for easier drop accuracy
+- **Smooth transitions**: All handles now have consistent opacity transitions
+- **Better hover behavior**: Handles only appear when hovering directly over their block
+- **CRITICAL: No nesting/splitting**: Blocks now ALWAYS drop between top-level blocks, never inside them
+  - Completely rewrote `findTopLevelPosFromCoords` to use DOM-based block detection
+  - **Fixes gap handling**: Hovering in gaps between blocks now works correctly
+    - Old approach used `posAtCoords` which gave inconsistent results in gaps (CSS margins)
+    - New approach finds closest top-level DOM element and maps directly to it
+    - Indicator and drop now match perfectly, even when hovering between blocks
+  - Fixed DOM element resolution to traverse up to top-level `.ProseMirror` children
+  - Both dragover (indicator) and drop (actual) use identical logic
+  - Prevents blocks from being dropped inside lists, blockquotes, or other containers
+  - Prevents text from being split across multiple blocks  
+  - Even when hovering over list items, drops happen before/after the entire list
+  - Improved no-op detection prevents unnecessary operations
+- **Adaptive edge snap**: Drop zones now scale with block height (25% of height, min 6px, max 16px)
+  - Prevents overlap on small blocks (24px blocks now have 6px edge zones with 12px middle zone)
+  - Maintains good UX on large blocks (60px blocks have 15px edge zones)
+- **Accurate drop indicator**: Blue indicator line now shows exactly where the block will drop
+  - Thicker (3px) and more visible with shadow and border radius
+  - Indicator position matches actual drop position
+- **Consistent drop logic**: Both dragover (indicator) and drop (actual) use identical calculations
+
 ### Next enhancements (optional)
-- Notion‑like slash UI with icons, categories, and right‑side previews.
-- Keyboard move up/down for blocks; optional subtle drag with drop indicators.
-- More blocks: H3, to‑do list, toggle list, callouts, images, embeds.
+- Keyboard move up/down for blocks.
+- More blocks: to‑do list, toggle list, callouts, images, embeds, tables.
+- Improved drop indicators with animations.
 

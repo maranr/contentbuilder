@@ -130,10 +130,10 @@ export function BlockProperties({ editor, className }: Props) {
     >
       <div className="flex flex-wrap items-end gap-2">
         <div className="flex flex-col">
-          <label className="text-xs text-gray-500">Top space</label>
+          <label className="text-xs text-gray-500">Top spacing</label>
           <input
             type="text"
-            placeholder="e.g. 0, 8px, 1rem"
+            placeholder="e.g. 0, 10px, 1rem"
             value={top}
             onChange={(e) => {
               setTop(e.target.value);
@@ -144,10 +144,10 @@ export function BlockProperties({ editor, className }: Props) {
           />
         </div>
         <div className="flex flex-col">
-          <label className="text-xs text-gray-500">Bottom space</label>
+          <label className="text-xs text-gray-500">Bottom spacing</label>
           <input
             type="text"
-            placeholder="e.g. 0, 8px, 1rem"
+            placeholder="e.g. 0, 10px, 1rem"
             value={bottom}
             onChange={(e) => {
               setBottom(e.target.value);
